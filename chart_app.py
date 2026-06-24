@@ -1,7 +1,6 @@
 # ============================================
-# STANDALONE 15-MINUTE PROJECTION CHART
-# Runs separately from Code 5
-# Deploy as a separate Streamlit app
+# CLEAN 15-MINUTE PROJECTION CHART
+# More readable, simplified, easier to understand
 # ============================================
 
 import streamlit as st
@@ -18,14 +17,14 @@ warnings.filterwarnings('ignore')
 
 # --- Page Config ---
 st.set_page_config(
-    page_title="15-Minute Price Projection",
+    page_title="Price Projection Chart",
     page_icon="📈",
     layout="wide"
 )
 
 # --- Header ---
-st.title("📈 15-Minute Price Projection Chart")
-st.caption(f"Model projected price vs. actual price • Updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+st.title("📈 Price Projection Chart")
+st.caption(f"Updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 # --- Settings ---
 PREDICT_WINDOW = 15
@@ -236,130 +235,166 @@ if selected_coin:
                 projections_df = get_price_projections(df_clean, feature_cols, predict_window=15)
                 
                 if not projections_df.empty:
+                    # --- CLEANER CHART ---
                     fig = make_subplots(
-                        rows=2, cols=1,
+                        rows=1, cols=1,
                         shared_xaxes=True,
-                        vertical_spacing=0.08,
-                        row_heights=[0.7, 0.3],
-                        subplot_titles=("Price Projection vs Actual", "Confidence & Signals")
+                        subplot_titles=("")
                     )
                     
-                    # Actual price
+                    # --- 1. ACTUAL PRICE (Green, thick) ---
                     fig.add_trace(
                         go.Scatter(
                             x=projections_df['time'],
                             y=projections_df['actual_price'],
                             mode='lines',
                             name='Actual Price',
-                            line=dict(color='#00b894', width=2)
-                        ),
-                        row=1, col=1
+                            line=dict(color='#00b894', width=3)
+                        )
                     )
                     
-                    # Projected price
+                    # --- 2. PROJECTED PRICE (Blue, dashed) ---
                     fig.add_trace(
                         go.Scatter(
                             x=projections_df['time'],
                             y=projections_df['projected_price'],
                             mode='lines',
-                            name='Projected Price (15-min ahead)',
+                            name='Projected (15-min ahead)',
                             line=dict(color='#667eea', width=2, dash='dot')
-                        ),
-                        row=1, col=1
+                        )
                     )
                     
-                    # Signals
+                    # --- 3. BUY YES SIGNALS (Large green triangles) ---
                     signal_up = projections_df[projections_df['signal'] == 'BUY YES']
-                    signal_down = projections_df[projections_df['signal'] == 'BUY NO']
-                    
                     if not signal_up.empty:
                         fig.add_trace(
                             go.Scatter(
                                 x=signal_up['time'],
                                 y=signal_up['actual_price'],
                                 mode='markers',
-                                name='BUY YES Signal',
-                                marker=dict(color='#00b894', size=12, symbol='triangle-up')
-                            ),
-                            row=1, col=1
+                                name='🔺 BUY YES',
+                                marker=dict(
+                                    color='#00b894',
+                                    size=15,
+                                    symbol='triangle-up',
+                                    line=dict(color='white', width=1)
+                                ),
+                                text=[f"Buy YES<br>Price: ${p:.2f}" for p in signal_up['actual_price']],
+                                hoverinfo='text'
+                            )
                         )
                     
+                    # --- 4. BUY NO SIGNALS (Large red triangles) ---
+                    signal_down = projections_df[projections_df['signal'] == 'BUY NO']
                     if not signal_down.empty:
                         fig.add_trace(
                             go.Scatter(
                                 x=signal_down['time'],
                                 y=signal_down['actual_price'],
                                 mode='markers',
-                                name='BUY NO Signal',
-                                marker=dict(color='#ff6b6b', size=12, symbol='triangle-down')
-                            ),
-                            row=1, col=1
+                                name='🔻 BUY NO',
+                                marker=dict(
+                                    color='#ff6b6b',
+                                    size=15,
+                                    symbol='triangle-down',
+                                    line=dict(color='white', width=1)
+                                ),
+                                text=[f"Buy NO<br>Price: ${p:.2f}" for p in signal_down['actual_price']],
+                                hoverinfo='text'
+                            )
                         )
                     
-                    # Confidence
-                    fig.add_trace(
-                        go.Scatter(
-                            x=projections_df['time'],
-                            y=projections_df['confidence'] * 100,
-                            mode='lines',
-                            name='Confidence (%)',
-                            line=dict(color='#fdcb6e', width=1.5)
-                        ),
-                        row=2, col=1
-                    )
-                    
-                    # Edge
-                    fig.add_trace(
-                        go.Scatter(
-                            x=projections_df['time'],
-                            y=projections_df['edge'] * 100,
-                            mode='lines',
-                            name='Edge (%)',
-                            line=dict(color='#ff6b6b', width=1.5, dash='dash')
-                        ),
-                        row=2, col=1
-                    )
-                    
-                    fig.add_hline(y=50, line_dash="dash", line_color="gray", row=2, col=1)
-                    
+                    # --- 5. CURRENT TIME VERTICAL LINE ---
                     current_time = datetime.now()
-                    fig.add_vline(x=current_time, line_dash="dash", line_color="white", opacity=0.5, row=1, col=1)
-                    fig.add_vline(x=current_time, line_dash="dash", line_color="white", opacity=0.5, row=2, col=1)
+                    fig.add_vline(
+                        x=current_time,
+                        line_dash="solid",
+                        line_color="white",
+                        opacity=0.6,
+                        line_width=2,
+                        annotation_text="📍 NOW",
+                        annotation_position="top"
+                    )
                     
+                    # --- 6. PRICE TARGET HIGHLIGHT (Current projected price) ---
+                    latest = projections_df.iloc[-1]
+                    
+                    # --- Layout ---
                     fig.update_layout(
-                        height=600,
+                        height=450,
                         template='plotly_dark',
                         showlegend=True,
-                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-                        margin=dict(l=0, r=0, t=30, b=0)
+                        legend=dict(
+                            orientation="h",
+                            yanchor="bottom",
+                            y=1.02,
+                            xanchor="right",
+                            x=1,
+                            font=dict(size=12)
+                        ),
+                        margin=dict(l=50, r=30, t=30, b=50),
+                        hovermode='x unified',
+                        font=dict(size=14),
+                        title_text="",
+                        xaxis=dict(
+                            title_text="Time",
+                            title_font=dict(size=14),
+                            tickfont=dict(size=12),
+                            rangeslider=dict(visible=False),
+                            showgrid=True,
+                            gridcolor='rgba(255,255,255,0.1)'
+                        ),
+                        yaxis=dict(
+                            title_text="Price ($)",
+                            title_font=dict(size=14),
+                            tickfont=dict(size=12),
+                            showgrid=True,
+                            gridcolor='rgba(255,255,255,0.1)'
+                        ),
+                        plot_bgcolor='rgba(0,0,0,0)',
+                        paper_bgcolor='rgba(0,0,0,0)'
                     )
-                    
-                    fig.update_yaxes(title_text="Price ($)", row=1, col=1)
-                    fig.update_yaxes(title_text="%", row=2, col=1)
-                    fig.update_xaxes(title_text="Time", row=2, col=1)
                     
                     st.plotly_chart(fig, use_container_width=True)
                     
-                    # Stats
-                    latest = projections_df.iloc[-1]
-                    col1, col2, col3, col4 = st.columns(4)
-                    col1.metric("Current Price", f"${latest['actual_price']:.2f}")
-                    col2.metric("Projected Price", f"${latest['projected_price']:.2f}")
-                    col3.metric("Confidence", f"{latest['confidence']:.0%}")
-                    col4.metric("Signal", latest['signal'])
+                    # --- CLEAN SUMMARY STATS ---
+                    st.divider()
                     
-                    st.caption("🟢 BUY YES Signals | 🔴 BUY NO Signals | White dashed line = Current Time")
+                    col1, col2, col3, col4, col5 = st.columns(5)
+                    
+                    # Direction indicator
+                    if latest['signal'] == 'BUY YES':
+                        direction_emoji = "🟢 ⬆️"
+                    elif latest['signal'] == 'BUY NO':
+                        direction_emoji = "🔴 ⬇️"
+                    else:
+                        direction_emoji = "🟡 ⏸️"
+                    
+                    col1.metric("Current Price", f"${latest['actual_price']:.2f}")
+                    col2.metric("15-min Target", f"${latest['projected_price']:.2f}")
+                    
+                    # Price difference
+                    price_diff = latest['projected_price'] - latest['actual_price']
+                    price_diff_pct = (price_diff / latest['actual_price']) * 100
+                    col3.metric("Projected Move", f"{price_diff_pct:+.1f}%", delta=f"${price_diff:+.2f}")
+                    
+                    col4.metric("Confidence", f"{latest['confidence']:.0%}")
+                    col5.metric("Signal", direction_emoji)
+                    
+                    # --- FOOTER ---
+                    st.caption("🔺 BUY YES = Model predicts price rise • 🔻 BUY NO = Model predicts price fall • White line = Current time")
+                    
                 else:
-                    st.warning("Not enough data for projections. Please try again in a few minutes.")
+                    st.warning("Not enough data. Waiting for more price data...")
             else:
                 st.warning("Not enough data. Waiting for more price data...")
         else:
             st.warning("No data available for this coin.")
     except Exception as e:
-        st.warning(f"Chart data unavailable: {e}")
+        st.warning(f"Chart unavailable: {e}")
 else:
     st.info("Select a coin to view the projection chart.")
 
 # --- Footer ---
 st.divider()
-st.caption(f"⚡ 15-Minute Price Projection • Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+st.caption(f"⚡ 15-Minute Projection • Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
